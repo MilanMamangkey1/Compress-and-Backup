@@ -36,7 +36,7 @@ echo.
 
 :: Load and display current profile
 call :GET_CURRENT_PROFILE
-echo   Current Profile: %YELLOW%!CURRENT_PROFILE!%RESET%
+echo   Current Job: %YELLOW%!CURRENT_PROFILE!%RESET%
 echo.
 
 echo   %BOLD%--- View ^& Edit ---%RESET%
@@ -52,8 +52,8 @@ echo   %BOLD%--- Security ---%RESET%
 echo   %CYAN%[6]%RESET% Generate New Password
 echo   %CYAN%[7]%RESET% Toggle Password Masking (Currently: %YELLOW%!MASK_PASSWORD!%RESET%)
 echo.
-echo   %BOLD%--- Profiles ^& Backup ---%RESET%
-echo   %CYAN%[8]%RESET% Switch/Create Profile
+echo   %BOLD%--- Jobs ^& Backup ---%RESET%
+echo   %CYAN%[8]%RESET% Switch/Create Job
 echo   %CYAN%[9]%RESET% Backup Current Config
 echo   %CYAN%[10]%RESET% Reset to Defaults
 echo.
@@ -746,43 +746,69 @@ timeout /t 2 >nul
 goto MAIN_MENU
 
 :: ============================================================================
-:: PROFILE MENU
+:: JOB MENU (formerly PROFILE MENU)
 :: ============================================================================
 :PROFILE_MENU
 cls
 echo %BOLD%%CYAN%============================================================================%RESET%
-echo %BOLD%%CYAN%                          PROFILE MANAGEMENT                               %RESET%
+echo %BOLD%%CYAN%                            JOB MANAGEMENT                                 %RESET%
 echo %BOLD%%CYAN%============================================================================%RESET%
 echo.
 
-echo   %BOLD%Available Profiles:%RESET%
+:: Check current default job
+set "DEFAULT_JOB="
+set "ACTIVE_JOB_FILE=%SCRIPT_DIR%active-job.txt"
+if exist "!ACTIVE_JOB_FILE!" (
+    for /f "usebackq delims=" %%J in ("!ACTIVE_JOB_FILE!") do set "DEFAULT_JOB=%%J"
+)
+
+echo   %BOLD%Available Jobs:%RESET%
 echo.
 set "PROFILE_NUM=0"
 for %%F in ("%SCRIPT_DIR%config*.txt") do (
-    set /a "PROFILE_NUM+=1"
-    set "PROFILE_!PROFILE_NUM!=%%~nxF"
-    if "%%~nxF"=="!CURRENT_PROFILE!" (
-        echo   %CYAN%[!PROFILE_NUM!]%RESET% %%~nxF %GREEN%[ACTIVE]%RESET%
-    ) else (
-        echo   %CYAN%[!PROFILE_NUM!]%RESET% %%~nxF
+    set "FNAME=%%~nxF"
+    :: Skip backup files
+    echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo !FNAME! | findstr /i "backup" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            set /a "PROFILE_NUM+=1"
+            set "PROFILE_!PROFILE_NUM!=%%~nxF"
+            :: Determine job display name
+            if "%%~nxF"=="config.txt" (
+                set "JOB_DISPLAY_NAME=default"
+            ) else (
+                set "JOB_DISPLAY_NAME=%%~nxF"
+                set "JOB_DISPLAY_NAME=!JOB_DISPLAY_NAME:config-=!"
+                set "JOB_DISPLAY_NAME=!JOB_DISPLAY_NAME:.txt=!"
+            )
+            :: Build display line with markers
+            set "MARKERS="
+            if "%%~nxF"=="!CURRENT_PROFILE!" set "MARKERS=!MARKERS! %GREEN%[EDITING]%RESET%"
+            if "!JOB_DISPLAY_NAME!"=="!DEFAULT_JOB!" set "MARKERS=!MARKERS! %CYAN%[DEFAULT]%RESET%"
+            echo   %CYAN%[!PROFILE_NUM!]%RESET% !JOB_DISPLAY_NAME!!MARKERS!
+        )
     )
 )
 echo.
-echo   %CYAN%[N]%RESET% Create New Profile
+echo   %CYAN%[N]%RESET% Create New Job
+echo   %CYAN%[D]%RESET% Set Default Job ^(for compress-and-backup.bat^)
 echo   %CYAN%[0]%RESET% Back to Main Menu
 echo.
+echo %CYAN%============================================================================%RESET%
 
 set /p "PROFILE_CHOICE=  Enter choice: "
 
 if /i "%PROFILE_CHOICE%"=="0" goto MAIN_MENU
 if /i "%PROFILE_CHOICE%"=="N" goto CREATE_PROFILE
+if /i "%PROFILE_CHOICE%"=="D" goto SET_DEFAULT_JOB
 
 :: Check if numeric choice
 set /a "CHECK_NUM=%PROFILE_CHOICE%" 2>nul
 if !CHECK_NUM! gtr 0 if !CHECK_NUM! leq !PROFILE_NUM! (
     set "SELECTED_PROFILE=!PROFILE_%PROFILE_CHOICE%!"
     set "CONFIG_FILE=%SCRIPT_DIR%!SELECTED_PROFILE!"
-    echo   %GREEN%Switched to profile: !SELECTED_PROFILE!%RESET%
+    echo   %GREEN%Switched to job: !SELECTED_PROFILE!%RESET%
     timeout /t 2 >nul
     goto MAIN_MENU
 )
@@ -791,9 +817,69 @@ echo %RED%  Invalid choice.%RESET%
 timeout /t 2 >nul
 goto PROFILE_MENU
 
+:SET_DEFAULT_JOB
+echo.
+echo   %BOLD%Set Default Job:%RESET%
+echo   The default job runs automatically when compress-and-backup.bat
+ echo   is executed without arguments.
+echo.
+set "DJOB_IDX=0"
+for %%F in ("%SCRIPT_DIR%config*.txt") do (
+    set "FNAME=%%~nxF"
+    echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo !FNAME! | findstr /i "backup" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            set /a "DJOB_IDX+=1"
+            set "DJOB_!DJOB_IDX!=%%~nxF"
+            if "%%~nxF"=="config.txt" (
+                echo   %CYAN%[!DJOB_IDX!]%RESET% default
+            ) else (
+                set "DJOB_DISP=%%~nxF"
+                set "DJOB_DISP=!DJOB_DISP:config-=!"
+                set "DJOB_DISP=!DJOB_DISP:.txt=!"
+                echo   %CYAN%[!DJOB_IDX!]%RESET% !DJOB_DISP!
+            )
+        )
+    )
+)
+echo.
+echo   %CYAN%[C]%RESET% Clear default ^(show menu each time^)
+echo   %CYAN%[0]%RESET% Cancel
+echo.
+set /p "DEFAULT_CHOICE=  Select job to set as default: "
+
+if /i "!DEFAULT_CHOICE!"=="0" goto PROFILE_MENU
+if /i "!DEFAULT_CHOICE!"=="C" (
+    if exist "!ACTIVE_JOB_FILE!" del "!ACTIVE_JOB_FILE!" >nul 2>&1
+    echo   %GREEN%Default cleared. Job menu will show each time.%RESET%
+    timeout /t 2 >nul
+    goto PROFILE_MENU
+)
+
+set /a "CHECK_DEFAULT=!DEFAULT_CHOICE!" 2>nul
+if !CHECK_DEFAULT! GEQ 1 if !CHECK_DEFAULT! LEQ !DJOB_IDX! (
+    set "SELECTED_DEFAULT=!DJOB_%DEFAULT_CHOICE%!"
+    if "!SELECTED_DEFAULT!"=="config.txt" (
+        echo default> "!ACTIVE_JOB_FILE!"
+        echo   %GREEN%Default job set to: default%RESET%
+    ) else (
+        set "SAVE_NAME=!SELECTED_DEFAULT:config-=!"
+        set "SAVE_NAME=!SAVE_NAME:.txt=!"
+        echo !SAVE_NAME!> "!ACTIVE_JOB_FILE!"
+        echo   %GREEN%Default job set to: !SAVE_NAME!%RESET%
+    )
+    timeout /t 2 >nul
+    goto PROFILE_MENU
+)
+
+echo %RED%  Invalid choice.%RESET%
+timeout /t 2 >nul
+goto SET_DEFAULT_JOB
+
 :CREATE_PROFILE
 echo.
-set /p "NEW_PROFILE_NAME=  Enter new profile name (without .txt): "
+set /p "NEW_PROFILE_NAME=  Enter new job name (without .txt): "
 if "!NEW_PROFILE_NAME!"=="" (
     echo   %YELLOW%Cancelled.%RESET%
     timeout /t 2 >nul
@@ -803,7 +889,7 @@ if "!NEW_PROFILE_NAME!"=="" (
 set "NEW_PROFILE_FILE=%SCRIPT_DIR%config-!NEW_PROFILE_NAME!.txt"
 
 if exist "!NEW_PROFILE_FILE!" (
-    echo   %RED%Profile already exists!%RESET%
+    echo   %RED%Job already exists!%RESET%
     timeout /t 2 >nul
     goto PROFILE_MENU
 )
@@ -812,7 +898,7 @@ if exist "!NEW_PROFILE_FILE!" (
 copy "!CONFIG_FILE!" "!NEW_PROFILE_FILE!" >nul
 set "CONFIG_FILE=!NEW_PROFILE_FILE!"
 
-echo   %GREEN%Created and switched to: config-!NEW_PROFILE_NAME!.txt%RESET%
+echo   %GREEN%Created and switched to job: !NEW_PROFILE_NAME!%RESET%
 timeout /t 2 >nul
 goto MAIN_MENU
 

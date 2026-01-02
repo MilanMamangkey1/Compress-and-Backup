@@ -10,10 +10,186 @@ setlocal EnableDelayedExpansion
 :: Initialize error tracking
 set "SCRIPT_ERROR=0"
 set "SCRIPT_DIR=%~dp0"
-set "CONFIG_FILE=%SCRIPT_DIR%config.txt"
 set "SEVENZIP_PATH=C:\Program Files\7-Zip\7z.exe"
 set "FFS_PATH=C:\Program Files\FreeFileSync\FreeFileSync.exe"
-set "LOG_FILE=%SCRIPT_DIR%backup_%DATE:~-4%%DATE:~-10,2%%DATE:~-7,2%.log"
+set "ACTIVE_JOB_FILE=%SCRIPT_DIR%active-job.txt"
+
+:: ============================================
+:: JOB SELECTION
+:: ============================================
+:: Check for command-line job argument
+set "JOB_NAME="
+set "CONFIG_FILE="
+
+if not "%~1"=="" (
+    set "JOB_NAME=%~1"
+    :: Check for special --list flag
+    if /i "!JOB_NAME!"=="--list" goto :LIST_JOBS_EXIT
+    if /i "!JOB_NAME!"=="-l" goto :LIST_JOBS_EXIT
+    :: Try exact config file first (config-JobName.txt)
+    if exist "%SCRIPT_DIR%config-!JOB_NAME!.txt" (
+        set "CONFIG_FILE=%SCRIPT_DIR%config-!JOB_NAME!.txt"
+    ) else if exist "%SCRIPT_DIR%config.txt" if /i "!JOB_NAME!"=="default" (
+        set "CONFIG_FILE=%SCRIPT_DIR%config.txt"
+        set "JOB_NAME=default"
+    ) else (
+        echo [ERROR] Job not found: !JOB_NAME!
+        echo [INFO] Available jobs:
+        call :LIST_JOBS
+        pause
+        exit /b 1
+    )
+    goto :JOB_SELECTED
+)
+
+:: No argument - check for active job file
+if exist "!ACTIVE_JOB_FILE!" (
+    for /f "usebackq delims=" %%J in ("!ACTIVE_JOB_FILE!") do set "JOB_NAME=%%J"
+    if defined JOB_NAME (
+        if /i "!JOB_NAME!"=="default" (
+            if exist "%SCRIPT_DIR%config.txt" (
+                set "CONFIG_FILE=%SCRIPT_DIR%config.txt"
+                goto :JOB_SELECTED
+            )
+        ) else if exist "%SCRIPT_DIR%config-!JOB_NAME!.txt" (
+            set "CONFIG_FILE=%SCRIPT_DIR%config-!JOB_NAME!.txt"
+            goto :JOB_SELECTED
+        )
+    )
+)
+
+:: Count available jobs
+set "JOB_COUNT=0"
+for %%F in ("%SCRIPT_DIR%config*.txt") do (
+    set "FNAME=%%~nxF"
+    :: Skip backup files
+    echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo !FNAME! | findstr /i "backup" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            set /a "JOB_COUNT+=1"
+        )
+    )
+)
+
+:: If only one job exists, use it automatically
+if !JOB_COUNT! EQU 1 (
+    for %%F in ("%SCRIPT_DIR%config*.txt") do (
+        set "FNAME=%%~nxF"
+        echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            echo !FNAME! | findstr /i "backup" >nul 2>&1
+            if !ERRORLEVEL! NEQ 0 (
+                set "CONFIG_FILE=%%F"
+                if "!FNAME!"=="config.txt" (
+                    set "JOB_NAME=default"
+                ) else (
+                    set "JOB_NAME=!FNAME:config-=!"
+                    set "JOB_NAME=!JOB_NAME:.txt=!"
+                )
+            )
+        )
+    )
+    goto :JOB_SELECTED
+)
+
+:: Multiple jobs - show selection menu
+if !JOB_COUNT! GTR 1 (
+    goto :JOB_MENU
+)
+
+:: No jobs found
+echo [ERROR] No configuration files found!
+echo [INFO] Run config-editor.bat to create a job configuration.
+pause
+exit /b 1
+
+:JOB_MENU
+cls
+echo.
+echo ============================================
+echo   SELECT BACKUP JOB
+echo ============================================
+echo.
+set "JOB_IDX=0"
+for %%F in ("%SCRIPT_DIR%config*.txt") do (
+    set "FNAME=%%~nxF"
+    :: Skip backup files
+    echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo !FNAME! | findstr /i "backup" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            set /a "JOB_IDX+=1"
+            set "JOB_FILE_!JOB_IDX!=%%F"
+            if "!FNAME!"=="config.txt" (
+                set "JOB_DISPLAY_!JOB_IDX!=default"
+                echo   [!JOB_IDX!] default ^(config.txt^)
+            ) else (
+                set "DISPLAY_NAME=!FNAME:config-=!"
+                set "DISPLAY_NAME=!DISPLAY_NAME:.txt=!"
+                set "JOB_DISPLAY_!JOB_IDX!=!DISPLAY_NAME!"
+                echo   [!JOB_IDX!] !DISPLAY_NAME!
+            )
+        )
+    )
+)
+echo.
+echo   [0] Exit
+echo.
+echo ============================================
+set /p "JOB_CHOICE=  Select job (1-%JOB_IDX%): "
+
+if "!JOB_CHOICE!"=="0" exit /b 0
+if "!JOB_CHOICE!"=="" goto :JOB_MENU
+
+:: Validate choice
+set /a "CHECK_CHOICE=!JOB_CHOICE!" 2>nul
+if !CHECK_CHOICE! GEQ 1 if !CHECK_CHOICE! LEQ !JOB_IDX! (
+    set "CONFIG_FILE=!JOB_FILE_%JOB_CHOICE%!"
+    set "JOB_NAME=!JOB_DISPLAY_%JOB_CHOICE%!"
+    goto :JOB_SELECTED
+)
+
+echo [ERROR] Invalid choice. Please try again.
+timeout /t 2 >nul
+goto :JOB_MENU
+
+:LIST_JOBS
+set "LIST_IDX=0"
+for %%F in ("%SCRIPT_DIR%config*.txt") do (
+    set "FNAME=%%~nxF"
+    echo !FNAME! | findstr /i "\.bak\>" >nul 2>&1
+    if !ERRORLEVEL! NEQ 0 (
+        echo !FNAME! | findstr /i "backup" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            set /a "LIST_IDX+=1"
+            if "!FNAME!"=="config.txt" (
+                echo        - default
+            ) else (
+                set "DISPLAY_NAME=!FNAME:config-=!"
+                set "DISPLAY_NAME=!DISPLAY_NAME:.txt=!"
+                echo        - !DISPLAY_NAME!
+            )
+        )
+    )
+)
+goto :EOF
+
+:LIST_JOBS_EXIT
+echo.
+echo Available backup jobs:
+call :LIST_JOBS
+echo.
+exit /b 0
+
+:JOB_SELECTED
+echo.
+echo [INFO] Running job: !JOB_NAME!
+echo [INFO] Config file: !CONFIG_FILE!
+echo.
+
+:: Set log file with job name
+set "LOG_FILE=%SCRIPT_DIR%backup_!JOB_NAME!_%DATE:~-4%%DATE:~-10,2%%DATE:~-7,2%.log"
 
 :: Initialize log file
 echo ============================================ > "%LOG_FILE%" 2>nul

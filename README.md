@@ -6,15 +6,72 @@ Compresses folders/files using 7-Zip with password protection and encrypted head
 
 | File | Purpose |
 |------|---------|
-| `compress-and-backup.bat` | Main script (no user interaction, can be scheduled) |
+| `compress-and-backup.bat` | Main script (supports multiple jobs) |
 | `config-editor.bat` | Interactive configuration editor |
-| `config.txt` | Configuration (paths, password, settings) |
+| `config.txt` | Default job configuration |
+| `config-*.txt` | Additional job configurations (e.g., `config-Work.txt`) |
+| `active-job.txt` | Stores the default job name (auto-generated) |
 | `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) |
 
 ## Quick Start
 
 1. Run `config-editor.bat` to configure your settings, or edit `config.txt` directly
 2. Run `compress-and-backup.bat`
+
+## Multiple Jobs
+
+You can create multiple backup jobs, each with its own sources, destinations, and settings.
+
+### Creating Jobs
+
+1. Run `config-editor.bat`
+2. Go to **[8] Switch/Create Job**
+3. Press **[N]** to create a new job
+4. Enter a name (e.g., `Work`, `Personal`, `Projects`)
+
+This creates `config-Work.txt`, `config-Personal.txt`, etc.
+
+### Running Jobs
+
+**Interactive mode** (shows menu if multiple jobs exist):
+```batch
+compress-and-backup.bat
+```
+
+**Run specific job by name**:
+```batch
+compress-and-backup.bat Work
+compress-and-backup.bat Personal
+compress-and-backup.bat default
+```
+
+**List available jobs**:
+```batch
+compress-and-backup.bat --list
+```
+
+### Setting a Default Job
+
+To skip the selection menu and always run a specific job:
+
+1. Run `config-editor.bat`
+2. Go to **[8] Switch/Create Job**
+3. Press **[D]** to set default
+4. Select the job to use as default
+
+The default job runs automatically when `compress-and-backup.bat` is executed without arguments.
+
+### Scheduling Multiple Jobs
+
+Use Windows Task Scheduler to run different jobs at different times:
+
+```batch
+:: Daily personal backup at 6 PM
+compress-and-backup.bat Personal
+
+:: Weekly work backup on Fridays
+compress-and-backup.bat Work
+```
 
 ## Configuration Options
 
@@ -55,10 +112,12 @@ Run `config-editor.bat` for an interactive menu:
 
 - View current configuration with path validation
 - Edit settings (password, compression, paths)
+- Manage source folders/files
 - Generate secure passwords (passphrase or random)
 - Test all paths before running
 - Dry-run preview
-- Multiple config profiles
+- **Multiple job configurations**
+- **Set default job for automated runs**
 - Automatic config backup
 
 ## What the Script Does
@@ -84,6 +143,18 @@ Run `config-editor.bat` for an interactive menu:
 
 - [7-Zip](https://7-zip.org/) installed at `C:\Program Files\7-Zip\7z.exe`
 - [FreeFileSync](https://freefilesync.org/) installed at `C:\Program Files\FreeFileSync\FreeFileSync.exe`
+
+## Cloud Storage Setup
+
+If your backup destination is a cloud service (Google Drive, SFTP, etc.), you must authenticate it in FreeFileSync first:
+
+1. Open **FreeFileSync** (not this script)
+2. Click the **cloud icon** next to the folder path field
+3. Select your cloud provider and sign in
+4. Once authenticated, copy the cloud path (e.g., `gdrive:\user@gmail.com\Backups`)
+5. Use this path as your `BACKUP_DESTINATION` in config
+
+> **Note:** FreeFileSync stores cloud credentials securely. You only need to authenticate once per cloud account.
 
 ## Security Note
 
