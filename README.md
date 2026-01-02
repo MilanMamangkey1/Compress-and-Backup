@@ -67,6 +67,14 @@ Run `config-editor.bat` for an interactive menu:
 
 3. **Syncs** the archive to the backup destination (Update mode - only copies if changed)
 
+## Use Cases
+
+- **Scheduled backups** — Run via Task Scheduler for automatic daily/weekly encrypted backups
+- **Cloud sync preparation** — Compress sensitive files before syncing to Dropbox, Google Drive, or OneDrive
+- **External drive backups** — Keep an encrypted archive copy on a USB or external HDD
+- **Project archiving** — Bundle multiple project folders into a single password-protected archive
+- **Sensitive document storage** — Encrypt personal documents, tax records, or financial files with hidden filenames
+
 ## Requirements
 
 - [7-Zip](https://7-zip.org/) installed at `C:\Program Files\7-Zip\7z.exe`
