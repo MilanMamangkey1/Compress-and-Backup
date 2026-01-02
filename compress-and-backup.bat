@@ -428,7 +428,6 @@ echo ============================================
 echo.
 
 call :LOG_INFO "All operations completed"
-pause
 goto :EOF
 
 :: ============================================
