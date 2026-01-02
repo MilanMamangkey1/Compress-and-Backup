@@ -144,6 +144,18 @@ Run `config-editor.bat` for an interactive menu:
 - [7-Zip](https://7-zip.org/) installed at `C:\Program Files\7-Zip\7z.exe`
 - [FreeFileSync](https://freefilesync.org/) installed at `C:\Program Files\FreeFileSync\FreeFileSync.exe`
 
+## Cloud Storage Setup
+
+If your backup destination is a cloud service (Google Drive, SFTP, etc.), you must authenticate it in FreeFileSync first:
+
+1. Open **FreeFileSync** (not this script)
+2. Click the **cloud icon** next to the folder path field
+3. Select your cloud provider and sign in
+4. Once authenticated, copy the cloud path (e.g., `gdrive:\user@gmail.com\Backups`)
+5. Use this path as your `BACKUP_DESTINATION` in config
+
+> **Note:** FreeFileSync stores cloud credentials securely. You only need to authenticate once per cloud account.
+
 ## Security Note
 
 ⚠️ The `config.txt` file contains your password in plain text. Keep this file secure and don't share it.
