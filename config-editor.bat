@@ -169,10 +169,6 @@ echo.
 echo   %CYAN%[4]%RESET% Edit Backup Destination
 echo       Current: %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
 echo.
-echo   %CYAN%[5]%RESET% Browse for Archive Output Directory (Folder Picker)
-echo.
-echo   %CYAN%[6]%RESET% Browse for Backup Destination (Folder Picker)
-echo.
 echo   %CYAN%[0]%RESET% Back to Main Menu
 echo.
 echo %CYAN%============================================================================%RESET%
@@ -183,8 +179,6 @@ if "%EDIT_CHOICE%"=="1" goto EDIT_PASSWORD
 if "%EDIT_CHOICE%"=="2" goto EDIT_COMPRESSION
 if "%EDIT_CHOICE%"=="3" goto EDIT_ARCHIVE_DIR
 if "%EDIT_CHOICE%"=="4" goto EDIT_BACKUP_DEST
-if "%EDIT_CHOICE%"=="5" goto BROWSE_ARCHIVE
-if "%EDIT_CHOICE%"=="6" goto BROWSE_BACKUP
 if "%EDIT_CHOICE%"=="0" goto MAIN_MENU
 
 echo %RED%  Invalid choice.%RESET%
