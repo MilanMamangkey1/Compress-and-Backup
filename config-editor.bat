@@ -155,13 +155,21 @@ call :LOAD_CONFIG
 echo   %CYAN%[1]%RESET% Edit Password
 echo       Current: %GRAY%!CFG_PASSWORD:~0,10!...%RESET%
 echo.
-echo   %CYAN%[2]%RESET% Edit Archive Output Directory
+echo   %CYAN%[2]%RESET% Edit Compression Level
+if "!CFG_COMPRESSION_LEVEL!"=="0" echo       Current: %YELLOW%0 - Store (no compression)%RESET%
+if "!CFG_COMPRESSION_LEVEL!"=="1" echo       Current: %YELLOW%1 - Fastest%RESET%
+if "!CFG_COMPRESSION_LEVEL!"=="3" echo       Current: %YELLOW%3 - Fast%RESET%
+if "!CFG_COMPRESSION_LEVEL!"=="5" echo       Current: %YELLOW%5 - Normal%RESET%
+if "!CFG_COMPRESSION_LEVEL!"=="7" echo       Current: %YELLOW%7 - Maximum%RESET%
+if "!CFG_COMPRESSION_LEVEL!"=="9" echo       Current: %YELLOW%9 - Ultra%RESET%
+echo.
+echo   %CYAN%[3]%RESET% Edit Archive Output Directory
 echo       Current: %YELLOW%!CFG_ARCHIVE_OUTPUT_DIR!%RESET%
 echo.
-echo   %CYAN%[3]%RESET% Edit Backup Destination
+echo   %CYAN%[4]%RESET% Edit Backup Destination
 echo       Current: %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
 echo.
-echo   %CYAN%[4]%RESET% Browse for Archive Output Directory (Folder Picker)
+echo   %CYAN%[5]%RESET% Browse for Archive Output Directory (Folder Picker)
 echo.
 echo   %CYAN%[0]%RESET% Back to Main Menu
 echo.
@@ -170,9 +178,10 @@ echo %CYAN%=====================================================================
 set /p "EDIT_CHOICE=  Enter choice: "
 
 if "%EDIT_CHOICE%"=="1" goto EDIT_PASSWORD
-if "%EDIT_CHOICE%"=="2" goto EDIT_ARCHIVE_DIR
-if "%EDIT_CHOICE%"=="3" goto EDIT_BACKUP_DEST
-if "%EDIT_CHOICE%"=="4" goto BROWSE_ARCHIVE
+if "%EDIT_CHOICE%"=="2" goto EDIT_COMPRESSION
+if "%EDIT_CHOICE%"=="3" goto EDIT_ARCHIVE_DIR
+if "%EDIT_CHOICE%"=="4" goto EDIT_BACKUP_DEST
+if "%EDIT_CHOICE%"=="5" goto BROWSE_ARCHIVE
 if "%EDIT_CHOICE%"=="0" goto MAIN_MENU
 
 echo %RED%  Invalid choice.%RESET%
@@ -190,6 +199,35 @@ if not "!NEW_VALUE!"=="" (
 ) else (
     echo   %YELLOW%Cancelled.%RESET%
 )
+timeout /t 2 >nul
+goto EDIT_MENU
+
+:EDIT_COMPRESSION
+echo.
+echo   %BOLD%Select compression level:%RESET%
+echo.
+echo   %CYAN%[0]%RESET% Store (no compression, fastest)
+echo   %CYAN%[1]%RESET% Fastest
+echo   %CYAN%[3]%RESET% Fast
+echo   %CYAN%[5]%RESET% Normal
+echo   %CYAN%[7]%RESET% Maximum
+echo   %CYAN%[9]%RESET% Ultra (smallest size, slowest)
+echo.
+set /p "COMP_CHOICE=  Enter level (0/1/3/5/7/9): "
+if "!COMP_CHOICE!"=="0" goto SET_COMPRESSION
+if "!COMP_CHOICE!"=="1" goto SET_COMPRESSION
+if "!COMP_CHOICE!"=="3" goto SET_COMPRESSION
+if "!COMP_CHOICE!"=="5" goto SET_COMPRESSION
+if "!COMP_CHOICE!"=="7" goto SET_COMPRESSION
+if "!COMP_CHOICE!"=="9" goto SET_COMPRESSION
+echo   %RED%Invalid choice. Use 0, 1, 3, 5, 7, or 9.%RESET%
+timeout /t 2 >nul
+goto EDIT_MENU
+
+:SET_COMPRESSION
+call :BACKUP_BEFORE_EDIT
+call :UPDATE_CONFIG "COMPRESSION_LEVEL" "!COMP_CHOICE!"
+echo   %GREEN%Compression level updated to !COMP_CHOICE!.%RESET%
 timeout /t 2 >nul
 goto EDIT_MENU
 
@@ -663,6 +701,7 @@ goto MAIN_MENU
 
 :LOAD_CONFIG
 set "CFG_PASSWORD="
+set "CFG_COMPRESSION_LEVEL=0"
 set "CFG_ARCHIVE_OUTPUT_DIR="
 set "CFG_BACKUP_DESTINATION="
 set "CFG_SOURCE_COUNT=0"
@@ -679,6 +718,7 @@ for /f "usebackq tokens=1,* delims==" %%A in ("!CONFIG_FILE!") do (
     set "LINE=%%A"
     if not "!LINE:~0,1!"=="#" if not "%%A"=="" (
         if "%%A"=="PASSWORD" set "CFG_PASSWORD=%%B"
+        if "%%A"=="COMPRESSION_LEVEL" set "CFG_COMPRESSION_LEVEL=%%B"
         if "%%A"=="ARCHIVE_OUTPUT_DIR" set "CFG_ARCHIVE_OUTPUT_DIR=%%B"
         if "%%A"=="BACKUP_DESTINATION" set "CFG_BACKUP_DESTINATION=%%B"
         set "KEY_NAME=%%A"

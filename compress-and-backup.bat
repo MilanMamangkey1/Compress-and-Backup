@@ -54,6 +54,7 @@ if %SOURCE_COUNT% equ 0 (
     pause
     exit /b 1
 )
+if not defined COMPRESSION_LEVEL set "COMPRESSION_LEVEL=0"
 if not defined ARCHIVE_OUTPUT_DIR (
     echo [ERROR] ARCHIVE_OUTPUT_DIR not set in config
     pause
@@ -125,7 +126,7 @@ for /L %%i in (1,1,%SOURCE_COUNT%) do (
     set "SOURCE_LIST=!SOURCE_LIST! "!SOURCE_%%i!""
 )
 
-"%SEVENZIP_PATH%" a -t7z -mx0 -mhe=on -p"%PASSWORD%" "%ARCHIVE_PATH%" !SOURCE_LIST!
+"%SEVENZIP_PATH%" a -t7z -mx%COMPRESSION_LEVEL% -mhe=on -p"%PASSWORD%" "%ARCHIVE_PATH%" !SOURCE_LIST!
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
