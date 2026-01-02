@@ -2,9 +2,9 @@
 # ==================================
 # Password for 7z archive (keep this file secure)
 # Set to NONE for no password protection (not recommended for sensitive data)
-PASSWORD=CHANGE-THIS-PASSWORD
+PASSWORD=unscented-sculpture-debate-cathouse-vegan5
 # Compression level: 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra
-COMPRESSION_LEVEL=0
+COMPRESSION_LEVEL=5
 # Source folders/files to compress (add as many as needed: SOURCE_1, SOURCE_2, etc.)
 SOURCE_1=C:\Path\To\Your\Folder
 # Where to save the compressed .7z file

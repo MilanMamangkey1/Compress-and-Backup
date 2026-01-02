@@ -171,6 +171,8 @@ echo       Current: %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
 echo.
 echo   %CYAN%[5]%RESET% Browse for Archive Output Directory (Folder Picker)
 echo.
+echo   %CYAN%[6]%RESET% Browse for Backup Destination (Folder Picker)
+echo.
 echo   %CYAN%[0]%RESET% Back to Main Menu
 echo.
 echo %CYAN%============================================================================%RESET%
@@ -182,6 +184,7 @@ if "%EDIT_CHOICE%"=="2" goto EDIT_COMPRESSION
 if "%EDIT_CHOICE%"=="3" goto EDIT_ARCHIVE_DIR
 if "%EDIT_CHOICE%"=="4" goto EDIT_BACKUP_DEST
 if "%EDIT_CHOICE%"=="5" goto BROWSE_ARCHIVE
+if "%EDIT_CHOICE%"=="6" goto BROWSE_BACKUP
 if "%EDIT_CHOICE%"=="0" goto MAIN_MENU
 
 echo %RED%  Invalid choice.%RESET%
@@ -234,39 +237,37 @@ goto EDIT_MENU
 :EDIT_ARCHIVE_DIR
 echo.
 echo   Current: !CFG_ARCHIVE_OUTPUT_DIR!
-echo   Enter new archive output directory (or leave empty to cancel):
-set /p "NEW_VALUE="
-if not "!NEW_VALUE!"=="" (
-    if exist "!NEW_VALUE!" (
-        call :BACKUP_BEFORE_EDIT
-        call :UPDATE_CONFIG "ARCHIVE_OUTPUT_DIR" "!NEW_VALUE!"
-        echo   %GREEN%Archive output directory updated.%RESET%
-    ) else (
-        echo   %RED%Warning: Path does not exist!%RESET%
-        set /p "CONFIRM=  Save anyway? (Y/N): "
-        if /i "!CONFIRM!"=="Y" (
+echo.
+echo   %CYAN%[1]%RESET% Type path manually
+echo   %CYAN%[2]%RESET% Browse with folder picker
+echo   %CYAN%[0]%RESET% Cancel
+echo.
+set /p "DIR_CHOICE=  Enter choice: "
+if "!DIR_CHOICE!"=="1" (
+    echo.
+    echo   Enter new archive output directory:
+    set /p "NEW_VALUE="
+    if not "!NEW_VALUE!"=="" (
+        if exist "!NEW_VALUE!" (
             call :BACKUP_BEFORE_EDIT
             call :UPDATE_CONFIG "ARCHIVE_OUTPUT_DIR" "!NEW_VALUE!"
             echo   %GREEN%Archive output directory updated.%RESET%
         ) else (
-            echo   %YELLOW%Cancelled.%RESET%
+            echo   %RED%Warning: Path does not exist!%RESET%
+            set /p "CONFIRM=  Save anyway? (Y/N): "
+            if /i "!CONFIRM!"=="Y" (
+                call :BACKUP_BEFORE_EDIT
+                call :UPDATE_CONFIG "ARCHIVE_OUTPUT_DIR" "!NEW_VALUE!"
+                echo   %GREEN%Archive output directory updated.%RESET%
+            ) else (
+                echo   %YELLOW%Cancelled.%RESET%
+            )
         )
+    ) else (
+        echo   %YELLOW%Cancelled.%RESET%
     )
-) else (
-    echo   %YELLOW%Cancelled.%RESET%
-)
-timeout /t 2 >nul
-goto EDIT_MENU
-
-:EDIT_BACKUP_DEST
-echo.
-echo   Current: !CFG_BACKUP_DESTINATION!
-echo   Enter new backup destination (or leave empty to cancel):
-set /p "NEW_VALUE="
-if not "!NEW_VALUE!"=="" (
-    call :BACKUP_BEFORE_EDIT
-    call :UPDATE_CONFIG "BACKUP_DESTINATION" "!NEW_VALUE!"
-    echo   %GREEN%Backup destination updated.%RESET%
+) else if "!DIR_CHOICE!"=="2" (
+    goto BROWSE_ARCHIVE
 ) else (
     echo   %YELLOW%Cancelled.%RESET%
 )
@@ -281,6 +282,48 @@ if not "!SELECTED_FOLDER!"=="" (
     call :BACKUP_BEFORE_EDIT
     call :UPDATE_CONFIG "ARCHIVE_OUTPUT_DIR" "!SELECTED_FOLDER!"
     echo   %GREEN%Archive output directory updated to: !SELECTED_FOLDER!%RESET%
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto EDIT_MENU
+
+:EDIT_BACKUP_DEST
+echo.
+echo   Current: !CFG_BACKUP_DESTINATION!
+echo.
+echo   %CYAN%[1]%RESET% Type path manually
+echo   %CYAN%[2]%RESET% Browse with folder picker
+echo   %CYAN%[0]%RESET% Cancel
+echo.
+set /p "DIR_CHOICE=  Enter choice: "
+if "!DIR_CHOICE!"=="1" (
+    echo.
+    echo   Enter new backup destination:
+    set /p "NEW_VALUE="
+    if not "!NEW_VALUE!"=="" (
+        call :BACKUP_BEFORE_EDIT
+        call :UPDATE_CONFIG "BACKUP_DESTINATION" "!NEW_VALUE!"
+        echo   %GREEN%Backup destination updated.%RESET%
+    ) else (
+        echo   %YELLOW%Cancelled.%RESET%
+    )
+) else if "!DIR_CHOICE!"=="2" (
+    goto BROWSE_BACKUP
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto EDIT_MENU
+
+:BROWSE_BACKUP
+echo.
+echo   %CYAN%Opening folder picker...%RESET%
+call :BROWSE_FOLDER "Select Backup Destination"
+if not "!SELECTED_FOLDER!"=="" (
+    call :BACKUP_BEFORE_EDIT
+    call :UPDATE_CONFIG "BACKUP_DESTINATION" "!SELECTED_FOLDER!"
+    echo   %GREEN%Backup destination updated to: !SELECTED_FOLDER!%RESET%
 ) else (
     echo   %YELLOW%Cancelled.%RESET%
 )
