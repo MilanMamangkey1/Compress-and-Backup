@@ -3,5 +3,5 @@
 *.7z
 Thumbs.db
 desktop.ini
-.log
-config.txt
+*.log
+*.txt
