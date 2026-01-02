@@ -1,6 +1,7 @@
 # Compress and Backup Configuration
 # ==================================
 # Password for 7z archive (keep this file secure)
+# Set to NONE for no password protection (not recommended for sensitive data)
 PASSWORD=CHANGE-THIS-PASSWORD
 # Compression level: 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra
 COMPRESSION_LEVEL=0

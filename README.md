@@ -20,7 +20,7 @@ Compresses folders/files using 7-Zip with password protection and encrypted head
 
 | Setting | Description |
 |---------|-------------|
-| `PASSWORD` | Password for the 7z archive |
+| `PASSWORD` | Password for the 7z archive (set to `NONE` for no password) |
 | `COMPRESSION_LEVEL` | 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra |
 | `SOURCE_1`, `SOURCE_2`, ... | Folders/files to compress (add as many as needed) |
 | `ARCHIVE_OUTPUT_DIR` | Where to save the .7z file |
@@ -36,6 +36,11 @@ SOURCE_2=C:\Users\John\Pictures\Important
 SOURCE_3=D:\Projects\ClientWork
 ARCHIVE_OUTPUT_DIR=C:\Backups
 BACKUP_DESTINATION=G:\CloudSync\Backups
+```
+
+To create an archive without password protection:
+```ini
+PASSWORD=NONE
 ```
 
 This would:

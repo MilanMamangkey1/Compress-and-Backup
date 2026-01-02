@@ -99,33 +99,43 @@ if !CONFIG_ERRORS! GTR 0 (
 )
 
 :: Validate required settings
+set "USE_PASSWORD=1"
 if not defined PASSWORD (
     echo [ERROR] PASSWORD not set in config
+    echo [INFO] Set PASSWORD=NONE for no password, or set a password.
     call :LOG_ERROR "PASSWORD not set in config"
     pause
     exit /b 1
 )
 
-:: Validate password is not the default placeholder
-if "!PASSWORD!"=="CHANGE-THIS-PASSWORD" (
-    echo [ERROR] Please change the default password in config.txt
-    echo [INFO] Run config-editor.bat to set a secure password.
-    call :LOG_ERROR "Default password not changed"
-    pause
-    exit /b 1
-)
+:: Check if user wants no password
+if /i "!PASSWORD!"=="NONE" (
+    set "USE_PASSWORD=0"
+    echo [INFO] No password protection - archive will be unencrypted.
+    call :LOG_INFO "No password mode selected"
+) else (
+    :: Validate password is not the default placeholder
+    if "!PASSWORD!"=="CHANGE-THIS-PASSWORD" (
+        echo [ERROR] Please change the default password in config.txt
+        echo [INFO] Run config-editor.bat to set a secure password.
+        echo [INFO] Or set PASSWORD=NONE for no password protection.
+        call :LOG_ERROR "Default password not changed"
+        pause
+        exit /b 1
+    )
 
-:: Validate password length (minimum 8 characters recommended)
-set "PASS_LEN=0"
-set "TEMP_PASS=!PASSWORD!"
-:COUNT_PASS_LEN
-if defined TEMP_PASS (
-    set "TEMP_PASS=!TEMP_PASS:~1!"
-    set /a "PASS_LEN+=1"
-    goto COUNT_PASS_LEN
-)
-if !PASS_LEN! LSS 8 (
-    echo [WARNING] Password is less than 8 characters. Consider using a stronger password.
+    :: Validate password length (minimum 8 characters recommended)
+    set "PASS_LEN=0"
+    set "TEMP_PASS=!PASSWORD!"
+    :COUNT_PASS_LEN
+    if defined TEMP_PASS (
+        set "TEMP_PASS=!TEMP_PASS:~1!"
+        set /a "PASS_LEN+=1"
+        goto COUNT_PASS_LEN
+    )
+    if !PASS_LEN! LSS 8 (
+        echo [WARNING] Password is less than 8 characters. Consider using a stronger password.
+    )
 )
 
 if %SOURCE_COUNT% equ 0 (
@@ -312,7 +322,14 @@ for /L %%i in (1,1,%SOURCE_COUNT%) do (
 echo [INFO] Starting compression...
 call :LOG_INFO "Starting compression of !SOURCE_COUNT! source(s)"
 
-"%SEVENZIP_PATH%" a -t7z -mx%COMPRESSION_LEVEL% -mhe=on -p"%PASSWORD%" "%ARCHIVE_PATH%" !SOURCE_LIST!
+:: Build 7z command based on password setting
+if !USE_PASSWORD! EQU 1 (
+    echo [INFO] Creating password-protected archive with encrypted headers...
+    "%SEVENZIP_PATH%" a -t7z -mx%COMPRESSION_LEVEL% -mhe=on -p"%PASSWORD%" "%ARCHIVE_PATH%" !SOURCE_LIST!
+) else (
+    echo [INFO] Creating archive without password protection...
+    "%SEVENZIP_PATH%" a -t7z -mx%COMPRESSION_LEVEL% "%ARCHIVE_PATH%" !SOURCE_LIST!
+)
 set "SEVENZIP_RESULT=!ERRORLEVEL!"
 
 :: Interpret 7-Zip exit codes
@@ -456,7 +473,11 @@ if exist "%ARCHIVE_PATH%" (
     
     :: Verify archive integrity using 7-Zip test command
     echo [INFO] Verifying archive integrity...
-    "%SEVENZIP_PATH%" t "%ARCHIVE_PATH%" -p"%PASSWORD%" >nul 2>&1
+    if !USE_PASSWORD! EQU 1 (
+        "%SEVENZIP_PATH%" t "%ARCHIVE_PATH%" -p"%PASSWORD%" >nul 2>&1
+    ) else (
+        "%SEVENZIP_PATH%" t "%ARCHIVE_PATH%" >nul 2>&1
+    )
     if !ERRORLEVEL! NEQ 0 (
         echo [ERROR] Archive integrity check failed!
         echo [INFO] The archive may be corrupted. Please try again.
