@@ -169,6 +169,9 @@ echo.
 echo   %CYAN%[4]%RESET% Edit Backup Destination
 echo       Current: %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
 echo.
+echo   %CYAN%[5]%RESET% Manage Source Folders/Files
+echo       Currently: %YELLOW%!CFG_SOURCE_COUNT! source(s) configured%RESET%
+echo.
 echo   %CYAN%[0]%RESET% Back to Main Menu
 echo.
 echo %CYAN%============================================================================%RESET%
@@ -179,6 +182,7 @@ if "%EDIT_CHOICE%"=="1" goto EDIT_PASSWORD
 if "%EDIT_CHOICE%"=="2" goto EDIT_COMPRESSION
 if "%EDIT_CHOICE%"=="3" goto EDIT_ARCHIVE_DIR
 if "%EDIT_CHOICE%"=="4" goto EDIT_BACKUP_DEST
+if "%EDIT_CHOICE%"=="5" goto MANAGE_SOURCES
 if "%EDIT_CHOICE%"=="0" goto MAIN_MENU
 
 echo %RED%  Invalid choice.%RESET%
@@ -323,6 +327,155 @@ if not "!SELECTED_FOLDER!"=="" (
 )
 timeout /t 2 >nul
 goto EDIT_MENU
+
+:: ============================================================================
+:: MANAGE SOURCE FOLDERS/FILES
+:: ============================================================================
+:MANAGE_SOURCES
+cls
+echo %BOLD%%CYAN%============================================================================%RESET%
+echo %BOLD%%CYAN%                      MANAGE SOURCE FOLDERS/FILES                         %RESET%
+echo %BOLD%%CYAN%============================================================================%RESET%
+echo.
+
+call :LOAD_CONFIG
+
+echo   %BOLD%Current Sources (%CFG_SOURCE_COUNT% configured):%RESET%
+if !CFG_SOURCE_COUNT! equ 0 (
+    echo   %YELLOW%[None configured]%RESET%
+) else (
+    for /L %%i in (1,1,!CFG_SOURCE_COUNT!) do (
+        echo   [%%i] %YELLOW%!CFG_SOURCE_%%i!%RESET%
+        if exist "!CFG_SOURCE_%%i!" (
+            echo       %GREEN%[EXISTS]%RESET%
+        ) else (
+            echo       %RED%[NOT FOUND]%RESET%
+        )
+    )
+)
+echo.
+echo   %CYAN%[1]%RESET% Add Source (type path)
+echo   %CYAN%[2]%RESET% Add Source (browse for folder)
+echo   %CYAN%[3]%RESET% Add Source (browse for file)
+echo   %CYAN%[4]%RESET% Remove Source
+echo   %CYAN%[5]%RESET% Clear All Sources
+echo.
+echo   %CYAN%[0]%RESET% Back to Edit Menu
+echo.
+echo %CYAN%============================================================================%RESET%
+
+set /p "SRC_CHOICE=  Enter choice: "
+
+if "!SRC_CHOICE!"=="1" goto ADD_SOURCE_TYPE
+if "!SRC_CHOICE!"=="2" goto ADD_SOURCE_BROWSE_FOLDER
+if "!SRC_CHOICE!"=="3" goto ADD_SOURCE_BROWSE_FILE
+if "!SRC_CHOICE!"=="4" goto REMOVE_SOURCE
+if "!SRC_CHOICE!"=="5" goto CLEAR_SOURCES
+if "!SRC_CHOICE!"=="0" goto EDIT_MENU
+
+echo %RED%  Invalid choice.%RESET%
+timeout /t 2 >nul
+goto MANAGE_SOURCES
+
+:ADD_SOURCE_TYPE
+echo.
+echo   Enter path to folder or file (or leave empty to cancel):
+set /p "NEW_SOURCE="
+if not "!NEW_SOURCE!"=="" (
+    if exist "!NEW_SOURCE!" (
+        call :BACKUP_BEFORE_EDIT
+        call :ADD_SOURCE_TO_CONFIG "!NEW_SOURCE!"
+        echo   %GREEN%Source added successfully.%RESET%
+    ) else (
+        echo   %RED%Warning: Path does not exist!%RESET%
+        set /p "CONFIRM=  Add anyway? (Y/N): "
+        if /i "!CONFIRM!"=="Y" (
+            call :BACKUP_BEFORE_EDIT
+            call :ADD_SOURCE_TO_CONFIG "!NEW_SOURCE!"
+            echo   %GREEN%Source added.%RESET%
+        ) else (
+            echo   %YELLOW%Cancelled.%RESET%
+        )
+    )
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto MANAGE_SOURCES
+
+:ADD_SOURCE_BROWSE_FOLDER
+echo.
+echo   %CYAN%Opening folder picker...%RESET%
+call :BROWSE_FOLDER "Select Source Folder"
+if not "!SELECTED_FOLDER!"=="" (
+    call :BACKUP_BEFORE_EDIT
+    call :ADD_SOURCE_TO_CONFIG "!SELECTED_FOLDER!"
+    echo   %GREEN%Source folder added: !SELECTED_FOLDER!%RESET%
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto MANAGE_SOURCES
+
+:ADD_SOURCE_BROWSE_FILE
+echo.
+echo   %CYAN%Opening file picker...%RESET%
+set "SELECTED_FILE="
+for /f "delims=" %%F in ('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $file = New-Object System.Windows.Forms.OpenFileDialog; $file.Title = 'Select Source File'; $file.Filter = 'All files (*.*)|*.*'; if ($file.ShowDialog() -eq 'OK') { $file.FileName }"') do set "SELECTED_FILE=%%F"
+if not "!SELECTED_FILE!"=="" (
+    call :BACKUP_BEFORE_EDIT
+    call :ADD_SOURCE_TO_CONFIG "!SELECTED_FILE!"
+    echo   %GREEN%Source file added: !SELECTED_FILE!%RESET%
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto MANAGE_SOURCES
+
+:REMOVE_SOURCE
+if !CFG_SOURCE_COUNT! equ 0 (
+    echo.
+    echo   %RED%No sources to remove.%RESET%
+    timeout /t 2 >nul
+    goto MANAGE_SOURCES
+)
+echo.
+echo   Enter source number to remove (1-!CFG_SOURCE_COUNT!) or 0 to cancel:
+set /p "REMOVE_NUM="
+if "!REMOVE_NUM!"=="0" (
+    echo   %YELLOW%Cancelled.%RESET%
+    timeout /t 2 >nul
+    goto MANAGE_SOURCES
+)
+if !REMOVE_NUM! GEQ 1 if !REMOVE_NUM! LEQ !CFG_SOURCE_COUNT! (
+    call :BACKUP_BEFORE_EDIT
+    call :REMOVE_SOURCE_FROM_CONFIG !REMOVE_NUM!
+    echo   %GREEN%Source removed successfully.%RESET%
+) else (
+    echo   %RED%Invalid source number.%RESET%
+)
+timeout /t 2 >nul
+goto MANAGE_SOURCES
+
+:CLEAR_SOURCES
+if !CFG_SOURCE_COUNT! equ 0 (
+    echo.
+    echo   %YELLOW%No sources to clear.%RESET%
+    timeout /t 2 >nul
+    goto MANAGE_SOURCES
+)
+echo.
+echo   %RED%Warning: This will remove ALL !CFG_SOURCE_COUNT! source(s)!%RESET%
+set /p "CONFIRM=  Are you sure? (Y/N): "
+if /i "!CONFIRM!"=="Y" (
+    call :BACKUP_BEFORE_EDIT
+    call :CLEAR_ALL_SOURCES
+    echo   %GREEN%All sources cleared.%RESET%
+) else (
+    echo   %YELLOW%Cancelled.%RESET%
+)
+timeout /t 2 >nul
+goto MANAGE_SOURCES
 
 :: ============================================================================
 :: ============================================================================
@@ -826,6 +979,72 @@ set "DIALOG_TITLE=%~1"
 
 for /f "delims=" %%F in ('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $folder = New-Object System.Windows.Forms.FolderBrowserDialog; $folder.Description = '%DIALOG_TITLE%'; $folder.ShowNewFolderButton = $true; if ($folder.ShowDialog() -eq 'OK') { $folder.SelectedPath }"') do set "SELECTED_FOLDER=%%F"
 
+goto :eof
+
+:ADD_SOURCE_TO_CONFIG
+set "NEW_SRC_PATH=%~1"
+:: Find the next available SOURCE_N number
+set "NEXT_NUM=1"
+:FIND_NEXT_SOURCE_NUM
+for /f "usebackq tokens=1,* delims==" %%A in ("!CONFIG_FILE!") do (
+    if "%%A"=="SOURCE_!NEXT_NUM!" (
+        set /a "NEXT_NUM+=1"
+        goto FIND_NEXT_SOURCE_NUM
+    )
+)
+:: Append to config file
+echo SOURCE_!NEXT_NUM!=!NEW_SRC_PATH!>> "!CONFIG_FILE!"
+goto :eof
+
+:REMOVE_SOURCE_FROM_CONFIG
+set "REMOVE_IDX=%~1"
+set "TEMP_FILE=%SCRIPT_DIR%config.tmp"
+set "CURRENT_SOURCE_NUM=0"
+set "NEW_SOURCE_NUM=0"
+
+:: Rewrite config, renumbering sources and skipping the removed one
+> "!TEMP_FILE!" (
+    for /f "usebackq delims=" %%L in ("!CONFIG_FILE!") do (
+        set "LINE=%%L"
+        set "IS_SOURCE=0"
+        :: Check if line starts with SOURCE_
+        echo %%L | findstr /b "SOURCE_" >nul 2>&1
+        if !ERRORLEVEL! EQU 0 (
+            set "IS_SOURCE=1"
+            set /a "CURRENT_SOURCE_NUM+=1"
+        )
+        if !IS_SOURCE! EQU 1 (
+            if !CURRENT_SOURCE_NUM! NEQ !REMOVE_IDX! (
+                set /a "NEW_SOURCE_NUM+=1"
+                :: Extract the path value
+                for /f "tokens=1,* delims==" %%A in ("%%L") do (
+                    echo SOURCE_!NEW_SOURCE_NUM!=%%B
+                )
+            )
+        ) else (
+            echo %%L
+        )
+    )
+)
+
+move /y "!TEMP_FILE!" "!CONFIG_FILE!" >nul
+goto :eof
+
+:CLEAR_ALL_SOURCES
+set "TEMP_FILE=%SCRIPT_DIR%config.tmp"
+
+:: Rewrite config without any SOURCE_ lines
+> "!TEMP_FILE!" (
+    for /f "usebackq delims=" %%L in ("!CONFIG_FILE!") do (
+        set "LINE=%%L"
+        echo %%L | findstr /b "SOURCE_" >nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            echo %%L
+        )
+    )
+)
+
+move /y "!TEMP_FILE!" "!CONFIG_FILE!" >nul
 goto :eof
 
 :: ============================================================================
