@@ -6,8 +6,8 @@ PASSWORD=unscented-sculpture-debate-cathouse-vegan5
 # Compression level: 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra
 COMPRESSION_LEVEL=5
 # Source folders/files to compress (add as many as needed: SOURCE_1, SOURCE_2, etc.)
-SOURCE_1=C:\Path\To\Your\Folder
 # Where to save the compressed .7z file
-ARCHIVE_OUTPUT_DIR=C:\Backups
+ARCHIVE_OUTPUT_DIR=E:\Personal Documents\Personal Importance\Security
 # Backup destination (where FreeFileSync will copy the archive)
-BACKUP_DESTINATION=D:\BackupDrive
+BACKUP_DESTINATION=gdrive:\kylan@helixcore.my.id\Security
+SOURCE_1=O:\Vermillion
