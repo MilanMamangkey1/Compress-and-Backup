@@ -120,18 +120,28 @@ if exist "!CFG_ARCHIVE_OUTPUT_DIR!" (
     echo     %RED%[NOT FOUND]%RESET%
 )
 echo.
-echo   %BOLD%Backup Destination:%RESET%
-echo     %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
-:: Check if it's a local path (second char is colon like C:\ or D:\)
-set "DEST_CHECK=!CFG_BACKUP_DESTINATION!"
-if "!DEST_CHECK:~1,1!"==":" (
-    if exist "!CFG_BACKUP_DESTINATION!" (
-        echo     %GREEN%[EXISTS]%RESET%
+echo   %BOLD%FreeFileSync Batch File:%RESET%
+if defined CFG_FFS_BATCH_FILE (
+    echo     %YELLOW%!CFG_FFS_BATCH_FILE!%RESET%
+    :: Resolve path for checking
+    set "FFS_CHECK_PATH=!CFG_FFS_BATCH_FILE!"
+    if "!FFS_CHECK_PATH:~1,1!"==":" (
+        :: Absolute path
+        if exist "!CFG_FFS_BATCH_FILE!" (
+            echo     %GREEN%[EXISTS]%RESET%
+        ) else (
+            echo     %RED%[NOT FOUND]%RESET%
+        )
     ) else (
-        echo     %RED%[NOT FOUND]%RESET%
+        :: Relative path - check from script directory
+        if exist "%SCRIPT_DIR%!CFG_FFS_BATCH_FILE!" (
+            echo     %GREEN%[EXISTS]%RESET% ^(relative to script dir^)
+        ) else (
+            echo     %RED%[NOT FOUND]%RESET%
+        )
     )
 ) else (
-    echo     %GRAY%[Cloud/Remote Path - Cannot verify]%RESET%
+    echo     %GRAY%[Not configured - sync will be skipped]%RESET%
 )
 
 echo.
@@ -166,8 +176,12 @@ echo.
 echo   %CYAN%[3]%RESET% Edit Archive Output Directory
 echo       Current: %YELLOW%!CFG_ARCHIVE_OUTPUT_DIR!%RESET%
 echo.
-echo   %CYAN%[4]%RESET% Edit Backup Destination
-echo       Current: %YELLOW%!CFG_BACKUP_DESTINATION!%RESET%
+echo   %CYAN%[4]%RESET% Edit FFS Batch File Path
+if defined CFG_FFS_BATCH_FILE (
+    echo       Current: %YELLOW%!CFG_FFS_BATCH_FILE!%RESET%
+) else (
+    echo       Current: %GRAY%[Not configured]%RESET%
+)
 echo.
 echo   %CYAN%[5]%RESET% Manage Source Folders/Files
 echo       Currently: %YELLOW%!CFG_SOURCE_COUNT! source(s) configured%RESET%
@@ -181,7 +195,7 @@ set /p "EDIT_CHOICE=  Enter choice: "
 if "%EDIT_CHOICE%"=="1" goto EDIT_PASSWORD
 if "%EDIT_CHOICE%"=="2" goto EDIT_COMPRESSION
 if "%EDIT_CHOICE%"=="3" goto EDIT_ARCHIVE_DIR
-if "%EDIT_CHOICE%"=="4" goto EDIT_BACKUP_DEST
+if "%EDIT_CHOICE%"=="4" goto EDIT_FFS_BATCH
 if "%EDIT_CHOICE%"=="5" goto MANAGE_SOURCES
 if "%EDIT_CHOICE%"=="0" goto MAIN_MENU
 
@@ -286,42 +300,73 @@ if not "!SELECTED_FOLDER!"=="" (
 timeout /t 2 >nul
 goto EDIT_MENU
 
-:EDIT_BACKUP_DEST
+:EDIT_FFS_BATCH
 echo.
-echo   Current: !CFG_BACKUP_DESTINATION!
+if defined CFG_FFS_BATCH_FILE (
+    echo   Current: !CFG_FFS_BATCH_FILE!
+) else (
+    echo   Current: [Not configured]
+)
 echo.
 echo   %CYAN%[1]%RESET% Type path manually
-echo   %CYAN%[2]%RESET% Browse with folder picker
+echo   %CYAN%[2]%RESET% Browse for .ffs_batch file
+echo   %CYAN%[3]%RESET% Clear ^(disable sync^)
 echo   %CYAN%[0]%RESET% Cancel
 echo.
-set /p "DIR_CHOICE=  Enter choice: "
-if "!DIR_CHOICE!"=="1" (
+set /p "FFS_CHOICE=  Enter choice: "
+if "!FFS_CHOICE!"=="1" (
     echo.
-    echo   Enter new backup destination:
+    echo   Enter path to .ffs_batch file:
+    echo   ^(Can be relative to script dir, e.g., sync-backup.ffs_batch^)
     set /p "NEW_VALUE="
     if not "!NEW_VALUE!"=="" (
-        call :BACKUP_BEFORE_EDIT
-        call :UPDATE_CONFIG "BACKUP_DESTINATION" "!NEW_VALUE!"
-        echo   %GREEN%Backup destination updated.%RESET%
+        :: Check if file exists (handle relative path)
+        set "CHECK_PATH=!NEW_VALUE!"
+        set "FILE_EXISTS=0"
+        if "!CHECK_PATH:~1,1!"==":" (
+            if exist "!NEW_VALUE!" set "FILE_EXISTS=1"
+        ) else (
+            if exist "%SCRIPT_DIR%!NEW_VALUE!" set "FILE_EXISTS=1"
+        )
+        if "!FILE_EXISTS!"=="1" (
+            call :BACKUP_BEFORE_EDIT
+            call :UPDATE_CONFIG "FFS_BATCH_FILE" "!NEW_VALUE!"
+            echo   %GREEN%FFS batch file path updated.%RESET%
+        ) else (
+            echo   %RED%Warning: File does not exist!%RESET%
+            set /p "CONFIRM=  Save anyway? (Y/N): "
+            if /i "!CONFIRM!"=="Y" (
+                call :BACKUP_BEFORE_EDIT
+                call :UPDATE_CONFIG "FFS_BATCH_FILE" "!NEW_VALUE!"
+                echo   %GREEN%FFS batch file path updated.%RESET%
+            ) else (
+                echo   %YELLOW%Cancelled.%RESET%
+            )
+        )
     ) else (
         echo   %YELLOW%Cancelled.%RESET%
     )
-) else if "!DIR_CHOICE!"=="2" (
-    goto BROWSE_BACKUP
+) else if "!FFS_CHOICE!"=="2" (
+    goto BROWSE_FFS_BATCH
+) else if "!FFS_CHOICE!"=="3" (
+    call :BACKUP_BEFORE_EDIT
+    call :UPDATE_CONFIG "FFS_BATCH_FILE" ""
+    echo   %GREEN%FFS batch file cleared. Sync will be skipped.%RESET%
 ) else (
     echo   %YELLOW%Cancelled.%RESET%
 )
 timeout /t 2 >nul
 goto EDIT_MENU
 
-:BROWSE_BACKUP
+:BROWSE_FFS_BATCH
 echo.
-echo   %CYAN%Opening folder picker...%RESET%
-call :BROWSE_FOLDER "Select Backup Destination"
-if not "!SELECTED_FOLDER!"=="" (
+echo   %CYAN%Opening file picker...%RESET%
+set "SELECTED_FILE="
+for /f "delims=" %%F in ('powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $file = New-Object System.Windows.Forms.OpenFileDialog; $file.Title = 'Select FreeFileSync Batch File'; $file.Filter = 'FFS Batch files (*.ffs_batch)|*.ffs_batch|All files (*.*)|*.*'; $file.InitialDirectory = '%SCRIPT_DIR:\=\\%'; if ($file.ShowDialog() -eq 'OK') { $file.FileName }"') do set "SELECTED_FILE=%%F"
+if not "!SELECTED_FILE!"=="" (
     call :BACKUP_BEFORE_EDIT
-    call :UPDATE_CONFIG "BACKUP_DESTINATION" "!SELECTED_FOLDER!"
-    echo   %GREEN%Backup destination updated to: !SELECTED_FOLDER!%RESET%
+    call :UPDATE_CONFIG "FFS_BATCH_FILE" "!SELECTED_FILE!"
+    echo   %GREEN%FFS batch file updated to: !SELECTED_FILE!%RESET%
 ) else (
     echo   %YELLOW%Cancelled.%RESET%
 )
@@ -539,20 +584,27 @@ if exist "!CFG_ARCHIVE_OUTPUT_DIR!" (
 )
 echo.
 
-echo   %BOLD%Testing Backup Destination:%RESET%
-echo   Path: !CFG_BACKUP_DESTINATION!
-:: Check if it looks like a local path (second char is colon like C:\)
-set "DEST_CHECK=!CFG_BACKUP_DESTINATION!"
-if "!DEST_CHECK:~1,1!"==":" (
-    if exist "!CFG_BACKUP_DESTINATION!" (
-        echo   Status: %GREEN%[OK] Folder exists%RESET%
+echo   %BOLD%Testing FreeFileSync Batch File:%RESET%
+if defined CFG_FFS_BATCH_FILE (
+    echo   Path: !CFG_FFS_BATCH_FILE!
+    :: Check if it's an absolute or relative path
+    set "FFS_CHECK=!CFG_FFS_BATCH_FILE!"
+    set "FFS_RESOLVED="
+    if "!FFS_CHECK:~1,1!"==":" (
+        set "FFS_RESOLVED=!CFG_FFS_BATCH_FILE!"
     ) else (
-        echo   Status: %RED%[FAIL] Folder does not exist%RESET%
+        set "FFS_RESOLVED=%SCRIPT_DIR%!CFG_FFS_BATCH_FILE!"
+    )
+    if exist "!FFS_RESOLVED!" (
+        echo   Status: %GREEN%[OK] File exists%RESET%
+    ) else (
+        echo   Status: %RED%[FAIL] File not found%RESET%
         set "ALL_VALID=0"
     )
 ) else (
-    echo   Status: %YELLOW%[SKIP] Cloud/Remote path - manual verification needed%RESET%
-    echo   Hint: Test with 'rclone lsd "!CFG_BACKUP_DESTINATION!"'
+    echo   Path: %GRAY%[Not configured]%RESET%
+    echo   Status: %YELLOW%[SKIP] Sync will be skipped%RESET%
+)
 )
 echo.
 
@@ -595,9 +647,14 @@ for /L %%i in (1,1,!CFG_SOURCE_COUNT!) do (
 echo           Output:  !CFG_ARCHIVE_OUTPUT_DIR!\!ARCHIVE_NAME!.7z
 echo           Method:  7z with AES-256 encryption
 echo.
-echo   %CYAN%Step 2:%RESET% Sync with FreeFileSync
-echo           From:    !CFG_ARCHIVE_OUTPUT_DIR!
-echo           To:      !CFG_BACKUP_DESTINATION!
+echo   %CYAN%Step 2:%RESET% Verify archive integrity
+echo.
+if defined CFG_FFS_BATCH_FILE (
+    echo   %CYAN%Step 3:%RESET% Sync with FreeFileSync
+    echo           Batch:   !CFG_FFS_BATCH_FILE!
+) else (
+    echo   %CYAN%Step 3:%RESET% %YELLOW%Sync will be SKIPPED%RESET% ^(no FFS_BATCH_FILE configured^)
+)
 echo.
 
 :: Estimate size
@@ -955,14 +1012,18 @@ echo.
 echo # Password for 7z archive ^(keep this file secure!^)
 echo PASSWORD=CHANGE-THIS-PASSWORD
 echo.
+echo # Compression level: 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra
+echo COMPRESSION_LEVEL=0
+echo.
 echo # Source folders/files to compress ^(add as many as needed: SOURCE_1, SOURCE_2, etc.^)
 echo SOURCE_1=C:\Path\To\Your\Folder
 echo.
 echo # Where to save the compressed .7z file
 echo ARCHIVE_OUTPUT_DIR=C:\Backups
 echo.
-echo # Backup destination ^(where FreeFileSync will copy the archive^)
-echo BACKUP_DESTINATION=D:\BackupDrive
+echo # FreeFileSync batch file path ^(create your own .ffs_batch file in FreeFileSync^)
+echo # Leave empty to skip sync step. Can be relative ^(e.g., sync-backup.ffs_batch^) or absolute.
+echo FFS_BATCH_FILE=
 ) > "!CONFIG_FILE!"
 
 echo.
@@ -979,7 +1040,7 @@ goto MAIN_MENU
 set "CFG_PASSWORD="
 set "CFG_COMPRESSION_LEVEL=0"
 set "CFG_ARCHIVE_OUTPUT_DIR="
-set "CFG_BACKUP_DESTINATION="
+set "CFG_FFS_BATCH_FILE="
 set "CFG_SOURCE_COUNT=0"
 
 :: Clear previous source entries (up to 20)
@@ -996,7 +1057,7 @@ for /f "usebackq tokens=1,* delims==" %%A in ("!CONFIG_FILE!") do (
         if "%%A"=="PASSWORD" set "CFG_PASSWORD=%%B"
         if "%%A"=="COMPRESSION_LEVEL" set "CFG_COMPRESSION_LEVEL=%%B"
         if "%%A"=="ARCHIVE_OUTPUT_DIR" set "CFG_ARCHIVE_OUTPUT_DIR=%%B"
-        if "%%A"=="BACKUP_DESTINATION" set "CFG_BACKUP_DESTINATION=%%B"
+        if "%%A"=="FFS_BATCH_FILE" set "CFG_FFS_BATCH_FILE=%%B"
         set "KEY_NAME=%%A"
         if "!KEY_NAME:~0,7!"=="SOURCE_" (
             set /a "CFG_SOURCE_COUNT+=1"

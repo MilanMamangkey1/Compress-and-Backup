@@ -8,6 +8,7 @@ COMPRESSION_LEVEL=5
 # Source folders/files to compress (add as many as needed: SOURCE_1, SOURCE_2, etc.)
 # Where to save the compressed .7z file
 ARCHIVE_OUTPUT_DIR=E:\Personal Documents\Personal Importance\Security
-# Backup destination (where FreeFileSync will copy the archive)
-BACKUP_DESTINATION=gdrive:\kylan@helixcore.my.id\Security
+# FreeFileSync batch file path (create your own .ffs_batch file in FreeFileSync)
+# Leave empty to skip sync step. Can be relative (e.g., sync-backup.ffs_batch) or absolute.
+FFS_BATCH_FILE=sync-Vermillion.ffs_batch
 SOURCE_1=O:\Vermillion

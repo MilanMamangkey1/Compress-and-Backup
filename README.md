@@ -1,6 +1,6 @@
 # Compress and Backup
 
-Compresses folders/files using 7-Zip with password protection and encrypted headers, then backs up to another location using FreeFileSync.
+Compresses folders/files using 7-Zip with password protection and encrypted headers, then optionally syncs to another location using a user-provided FreeFileSync batch file.
 
 ## Files
 
@@ -12,9 +12,7 @@ Compresses folders/files using 7-Zip with password protection and encrypted head
 | `config.txt` | Default job configuration |
 | `config-*.txt` | Additional job configurations (e.g., `config-Work.txt`) |
 | `active-job.txt` | Stores the default job name (auto-generated) |
-| `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) |
-| `sync-*.ffs_batch.hash` | Hash file for modification detection (auto-generated) |
-| `sync-*.ffs_batch.keep` | Marker file when user keeps custom FFS (auto-generated) |
+| `sync-*.ffs_batch` | User-provided FreeFileSync batch files (you create these) |
 ## Quick Start
 
 1. Run `config-editor.bat` to configure your settings, or edit `config.txt` directly
@@ -112,7 +110,7 @@ wscript run-hidden.vbs "Work"
 | `COMPRESSION_LEVEL` | 0=Store, 1=Fastest, 3=Fast, 5=Normal, 7=Maximum, 9=Ultra |
 | `SOURCE_1`, `SOURCE_2`, ... | Folders/files to compress (add as many as needed) |
 | `ARCHIVE_OUTPUT_DIR` | Where to save the .7z file |
-| `BACKUP_DESTINATION` | Where FreeFileSync copies the archive |
+| `FFS_BATCH_FILE` | Path to your FreeFileSync batch file (leave empty to skip sync) |
 
 ## Example Config
 
@@ -123,7 +121,7 @@ SOURCE_1=C:\Users\John\Documents
 SOURCE_2=C:\Users\John\Pictures\Important
 SOURCE_3=D:\Projects\ClientWork
 ARCHIVE_OUTPUT_DIR=C:\Backups
-BACKUP_DESTINATION=G:\CloudSync\Backups
+FFS_BATCH_FILE=sync-backup.ffs_batch
 ```
 
 To create an archive without password protection:
@@ -131,9 +129,14 @@ To create an archive without password protection:
 PASSWORD=NONE
 ```
 
+To skip the sync step entirely:
+```ini
+FFS_BATCH_FILE=
+```
+
 This would:
 - Compress all 3 sources into a single archive at `C:\Backups\backup_20260102.7z`
-- Sync it to `G:\CloudSync\Backups\`
+- Sync using the FreeFileSync batch file `sync-backup.ffs_batch` (if configured)
 
 > **Note:** With a single source, the archive is named after the folder (e.g., `Documents.7z`). With multiple sources, it uses a date-based name.
 
@@ -158,38 +161,30 @@ Run `config-editor.bat` for an interactive menu:
    - Password protects the archive
    - Encrypts file names (`-mhe=on`) for extra security
 
-2. **Generates** a FreeFileSync batch file (with modification detection - see below)
+2. **Verifies** archive integrity using 7-Zip test command
 
-3. **Syncs** the archive to the backup destination (Update mode - only copies if changed)
+3. **Syncs** using your FreeFileSync batch file (if configured):
+   - If `FFS_BATCH_FILE` is set and the file exists, runs the sync
+   - If not configured or file not found, skips sync with a warning
 
-## FreeFileSync Customization
+## Creating a FreeFileSync Batch File
 
-The script auto-generates a `.ffs_batch` file for syncing. If you customize this file (e.g., change sync options, add filters), the script will detect your changes.
+Since the script uses your own `.ffs_batch` file, you need to create one in FreeFileSync:
 
-### Modification Detection
+1. Open **FreeFileSync**
+2. Set up your sync:
+   - **Left side**: Your archive output directory (e.g., `C:\Backups`)
+   - **Right side**: Your backup destination (e.g., `G:\CloudSync\Backups` or cloud path)
+3. Configure sync options (Update, Mirror, etc.)
+4. Go to **File → Save as Batch Job**
+5. Save as `sync-backup.ffs_batch` (or any name) in the script directory
+6. Set `FFS_BATCH_FILE=sync-backup.ffs_batch` in your config
 
-When the script detects a modified FFS batch file, you'll see:
+### Tips for Batch Files
 
-```
-[WARNING] FreeFileSync batch file has been modified:
-          E:\path\sync-backup.ffs_batch
-
-  [K] Keep your customized version (remember choice)
-  [R] Regenerate fresh from template
-  [C] Cancel operation
-```
-
-| Option | Effect |
-|--------|--------|
-| **[K] Keep** | Uses your customized file and remembers the choice (won't ask again) |
-| **[R] Regenerate** | Overwrites with fresh template (forgets "keep" preference) |
-| **[C] Cancel** | Exits without syncing |
-
-### Resetting the "Keep" Choice
-
-If you previously chose **Keep** but want to be prompted again:
-- Choose **[R]egenerate** when prompted, or
-- Delete the `.ffs_batch.keep` marker file manually
+- Use **Update** mode to only copy changed files
+- Enable **Minimized to tray** for silent operation
+- Set **Auto-close** if you want no user interaction
 
 ## Use Cases
 
@@ -211,8 +206,7 @@ If your backup destination is a cloud service (Google Drive, SFTP, etc.), you mu
 1. Open **FreeFileSync** (not this script)
 2. Click the **cloud icon** next to the folder path field
 3. Select your cloud provider and sign in
-4. Once authenticated, copy the cloud path (e.g., `gdrive:\user@gmail.com\Backups`)
-5. Use this path as your `BACKUP_DESTINATION` in config
+4. Once authenticated, use the cloud path as the **Right side** when creating your `.ffs_batch` file
 
 > **Note:** FreeFileSync stores cloud credentials securely. You only need to authenticate once per cloud account.
 

@@ -279,11 +279,6 @@ if not defined ARCHIVE_OUTPUT_DIR (
     pause
     exit /b 1
 )
-if not defined BACKUP_DESTINATION (
-    echo [ERROR] BACKUP_DESTINATION not set in config
-    pause
-    exit /b 1
-)
 
 :: Validate all source folders exist
 echo [INFO] Found %SOURCE_COUNT% source(s) to backup
@@ -309,15 +304,6 @@ if not exist "%ARCHIVE_OUTPUT_DIR%" (
     mkdir "%ARCHIVE_OUTPUT_DIR%" 2>nul
 )
 
-:: Check backup destination accessibility (if local path)
-set "DEST_CHECK=%BACKUP_DESTINATION%"
-if "!DEST_CHECK:~1,1!"==":" (
-    if not exist "%BACKUP_DESTINATION%" (
-        echo [INFO] Creating backup destination directory...
-        mkdir "%BACKUP_DESTINATION%" 2>nul
-    )
-)
-
 :: Set archive name based on date/time for multi-source backup
 set "ARCHIVE_NAME=backup_%DATE:~-4%%DATE:~-10,2%%DATE:~-7,2%"
 set "ARCHIVE_NAME=!ARCHIVE_NAME: =0!"
@@ -340,7 +326,11 @@ for /L %%i in (1,1,%SOURCE_COUNT%) do (
     echo                      [%%i] !SOURCE_%%i!
 )
 echo   Archive Output:    %ARCHIVE_PATH%
-echo   Backup Destination:%BACKUP_DESTINATION%
+if defined FFS_BATCH_FILE (
+    echo   Sync Batch File:   %FFS_BATCH_FILE%
+) else (
+    echo   Sync Batch File:   [Not configured]
+)
 echo.
 echo ============================================
 echo.
@@ -441,189 +431,25 @@ exit /b !SEVENZIP_RESULT!
 :SEVENZIP_DONE
 echo.
 
-:: Generate FFS batch file path
-set "FFS_BATCH=%SCRIPT_DIR%sync-%ARCHIVE_NAME%.ffs_batch"
-set "FFS_HASH_FILE=!FFS_BATCH!.hash"
-set "FFS_KEEP_FILE=!FFS_BATCH!.keep"
-
 :: ============================================
-:: FFS MODIFICATION DETECTION
+:: FFS BATCH FILE RESOLUTION
 :: ============================================
-:: Check if FFS file exists and might have been modified by user
-set "FFS_MODIFIED=0"
-set "FFS_ACTION=generate"
-
-if exist "!FFS_BATCH!" (
-    :: Check if user previously chose to keep their customized version
-    if exist "!FFS_KEEP_FILE!" (
-        set "FFS_ACTION=keep"
-        echo [INFO] Using previously kept custom FFS batch file.
-        goto :FFS_SKIP_DETECTION
-    )
-    
-    :: File exists - check for modifications
-    if exist "!FFS_HASH_FILE!" (
-        :: Read stored hash
-        set "STORED_HASH="
-        for /f "usebackq delims=" %%H in ("!FFS_HASH_FILE!") do set "STORED_HASH=%%H"
-        
-        :: Compute current file hash
-        call :COMPUTE_FILE_HASH "!FFS_BATCH!"
-        set "CURRENT_HASH=!FILE_HASH!"
-        
-        if defined STORED_HASH if defined CURRENT_HASH (
-            if /i "!CURRENT_HASH!" NEQ "!STORED_HASH!" (
-                set "FFS_MODIFIED=1"
-            )
-        )
-        :: If stored hash is empty, treat as modified
-        if not defined STORED_HASH set "FFS_MODIFIED=1"
+:: Resolve FFS_BATCH_FILE path (support relative paths from script directory)
+set "FFS_BATCH="
+if defined FFS_BATCH_FILE (
+    :: Check if it's an absolute path (second char is colon like C:\)
+    set "PATH_CHECK=!FFS_BATCH_FILE!"
+    if "!PATH_CHECK:~1,1!"==":" (
+        set "FFS_BATCH=!FFS_BATCH_FILE!"
     ) else (
-        :: No hash file = assume user created/modified the FFS file manually
-        set "FFS_MODIFIED=1"
+        :: Relative path - resolve from script directory
+        set "FFS_BATCH=%SCRIPT_DIR%!FFS_BATCH_FILE!"
     )
 )
 
-:: Prompt user if file was modified
-if "!FFS_MODIFIED!"=="1" (
-    echo.
-    echo [WARNING] FreeFileSync batch file has been modified:
-    echo           !FFS_BATCH!
-    echo.
-    echo   [K] Keep your customized version ^(remember choice^)
-    echo   [R] Regenerate fresh from template
-    echo   [C] Cancel operation
-    echo.
-    choice /c KRC /n /m "  Your choice [K/R/C]: "
-    
-    if !ERRORLEVEL! EQU 1 (
-        set "FFS_ACTION=keep"
-        :: Create keep marker so we don't prompt again
-        echo kept> "!FFS_KEEP_FILE!"
-        echo [INFO] Keeping existing FFS batch file. Choice remembered.
-    ) else if !ERRORLEVEL! EQU 2 (
-        set "FFS_ACTION=generate"
-        :: Remove keep marker if it exists
-        if exist "!FFS_KEEP_FILE!" del "!FFS_KEEP_FILE!" 2>nul
-        echo [INFO] Regenerating FFS batch file...
-    ) else if !ERRORLEVEL! EQU 3 (
-        echo [INFO] Operation cancelled by user.
-        call :LOG_INFO "Operation cancelled - FFS modification prompt"
-        exit /b 0
-    )
-)
-
-:FFS_SKIP_DETECTION
-:: Step 2: Generate or keep FreeFileSync batch file
-if /i "!FFS_ACTION!"=="generate" (
-    echo [STEP 2] Generating FreeFileSync batch file...
-    if exist "!FFS_BATCH!" del "!FFS_BATCH!" 2>nul
-    :: Remove keep marker when regenerating
-    if exist "!FFS_KEEP_FILE!" del "!FFS_KEEP_FILE!" 2>nul
-    
-    :: Create FFS batch XML file directly using echo commands
-    set "OUTFILE=!FFS_BATCH!"
-    
-    :: Call subroutine to generate FFS file
-    call :GENERATE_FFS_FILE
-    goto :FFS_FILE_GENERATED
-) else (
-    echo [STEP 2] Using existing FreeFileSync batch file...
-    echo [INFO] !FFS_BATCH!
-    goto :FFS_FILE_DONE
-)
-
-:GENERATE_FFS_FILE
-:: Use global variables directly instead of parameters
-set "OUT=!OUTFILE!"
-set "ARCNAME=!ARCHIVE_NAME!"
-set "LEFTPATH=!ARCHIVE_OUTPUT_DIR!"
-set "RIGHTPATH=!BACKUP_DESTINATION!"
-
-:: Write to output file using a single block redirect
-(
-echo ^<?xml version="1.0" encoding="utf-8"?^>
-echo ^<FreeFileSync XmlType="BATCH" XmlFormat="23"^>
-echo     ^<Notes/^>
-echo     ^<Compare^>
-echo         ^<Variant^>TimeAndSize^</Variant^>
-echo         ^<Symlinks^>Follow^</Symlinks^>
-echo         ^<IgnoreTimeShift/^>
-echo     ^</Compare^>
-echo     ^<Synchronize^>
-echo         ^<Changes^>
-echo             ^<Left Create="right" Update="right" Delete="none"/^>
-echo             ^<Right Create="none" Update="none" Delete="none"/^>
-echo         ^</Changes^>
-echo         ^<DeletionPolicy^>RecycleBin^</DeletionPolicy^>
-echo         ^<VersioningFolder Style="Replace"/^>
-echo     ^</Synchronize^>
-echo     ^<Filter^>
-echo         ^<Include^>
-echo             ^<Item^>\%ARCNAME%.7z^</Item^>
-echo         ^</Include^>
-echo         ^<Exclude^>
-echo             ^<Item^>\System Volume Information\^</Item^>
-echo             ^<Item^>\$Recycle.Bin\^</Item^>
-echo             ^<Item^>*\thumbs.db^</Item^>
-echo         ^</Exclude^>
-echo         ^<SizeMin Unit="None"^>0^</SizeMin^>
-echo         ^<SizeMax Unit="None"^>0^</SizeMax^>
-echo         ^<TimeSpan Type="None"^>0^</TimeSpan^>
-echo     ^</Filter^>
-echo     ^<FolderPairs^>
-echo         ^<Pair^>
-echo             ^<Left^>%LEFTPATH%^</Left^>
-echo             ^<Right^>%RIGHTPATH%^</Right^>
-echo         ^</Pair^>
-echo     ^</FolderPairs^>
-echo     ^<Errors Ignore="false" Retry="1" Delay="5"/^>
-echo     ^<PostSyncCommand Condition="Completion"/^>
-echo     ^<LogFolder/^>
-echo     ^<EmailNotification Condition="Always"/^>
-echo     ^<GridViewType^>Action^</GridViewType^>
-echo     ^<Batch^>
-echo         ^<ProgressDialog Minimized="true" AutoClose="true"/^>
-echo         ^<ErrorDialog^>Show^</ErrorDialog^>
-echo         ^<PostSyncAction^>None^</PostSyncAction^>
-echo     ^</Batch^>
-echo ^</FreeFileSync^>
-) > "%OUT%"
-goto :EOF
-
-:FFS_FILE_GENERATED
-:: Verify FFS batch file was created successfully
-set "FFS_EXISTS=0"
-for %%F in ("%FFS_BATCH%") do if exist "%%~F" set "FFS_EXISTS=1"
-if "!FFS_EXISTS!"=="0" (
-    echo [ERROR] Failed to create FreeFileSync batch file: %FFS_BATCH%
-    echo [INFO] Check write permissions in script directory.
-    call :LOG_ERROR "Failed to create FFS batch file"
-    pause
-    exit /b 1
-)
-
-:: Verify the batch file has content
-for %%A in ("%FFS_BATCH%") do set "FFS_SIZE=%%~zA"
-if "!FFS_SIZE!"=="" set "FFS_SIZE=0"
-set /a "MINSIZE=100"
-set /a "CHECKSIZE=!FFS_SIZE!"
-if !CHECKSIZE! LSS !MINSIZE! (
-    echo [ERROR] FreeFileSync batch file appears to be corrupted (too small^).
-    call :LOG_ERROR "FFS batch file corrupted"
-    pause
-    exit /b 1
-)
-
-echo [SUCCESS] FreeFileSync batch created: %FFS_BATCH%
-
-:: Store hash of freshly generated file for future modification detection
-call :COMPUTE_FILE_HASH "!FFS_BATCH!"
-echo !FILE_HASH!> "!FFS_HASH_FILE!"
-echo [INFO] Hash stored for modification detection.
-echo.
-
-:FFS_FILE_DONE
+:: ============================================
+:: STEP 2: VERIFY ARCHIVE AND RUN FREFILESYNC
+:: ============================================
 :: Verify archive exists before syncing
 if not exist "%ARCHIVE_PATH%" (
     echo [ERROR] Archive NOT found at: %ARCHIVE_PATH%
@@ -632,7 +458,7 @@ if not exist "%ARCHIVE_PATH%" (
 )
 
 :: Verify archive integrity using 7-Zip test command
-echo [INFO] Verifying archive integrity...
+echo [STEP 2] Verifying archive integrity...
 set "TEST_RESULT=0"
 if !USE_PASSWORD! EQU 1 (
     "%SEVENZIP_PATH%" t "%ARCHIVE_PATH%" -p"%PASSWORD%" >nul 2>&1
@@ -649,18 +475,32 @@ if !TEST_RESULT! NEQ 0 (
 echo [SUCCESS] Archive integrity verified.
 echo.
 
-:: Step 3: Run FreeFileSync sync
+:: Step 3: Run FreeFileSync sync (if configured)
+if not defined FFS_BATCH (
+    echo [STEP 3] FreeFileSync sync skipped.
+    echo [WARNING] No FFS_BATCH_FILE configured in config.
+    echo [INFO] To enable sync, set FFS_BATCH_FILE in your config to point to a .ffs_batch file.
+    goto :FFS_DONE
+)
+
+if not exist "!FFS_BATCH!" (
+    echo [STEP 3] FreeFileSync sync skipped.
+    echo [WARNING] FFS batch file not found: !FFS_BATCH!
+    echo [INFO] Create a .ffs_batch file in FreeFileSync and set FFS_BATCH_FILE in config.
+    goto :FFS_DONE
+)
+
 echo [STEP 3] Running FreeFileSync backup...
-echo [INFO] Syncing: %ARCHIVE_OUTPUT_DIR% --^> %BACKUP_DESTINATION%
+echo [INFO] Using batch file: !FFS_BATCH!
 
 if not exist "%FFS_PATH%" (
     echo [WARNING] FreeFileSync not found at: %FFS_PATH%
-    echo [INFO] You can run the batch file manually: %FFS_BATCH%
+    echo [INFO] You can run the batch file manually: !FFS_BATCH!
     goto :FFS_DONE
 )
 
 echo [INFO] Starting FreeFileSync...
-"%FFS_PATH%" "%FFS_BATCH%"
+"%FFS_PATH%" "!FFS_BATCH!"
 set "FFS_RESULT=!ERRORLEVEL!"
 
 if !FFS_RESULT! EQU 0 (
@@ -714,17 +554,4 @@ if defined TEMP_PASS (
     set /a "PASS_LEN+=1"
     goto :COUNT_PASS_LOOP
 )
-goto :EOF
-
-:COMPUTE_FILE_HASH
-:: Computes MD5 hash of a file using certutil
-:: Input: %~1 = file path
-:: Output: Sets FILE_HASH variable
-set "FILE_HASH="
-if not exist "%~1" goto :EOF
-for /f "skip=1 tokens=*" %%H in ('certutil -hashfile "%~1" MD5 2^>nul') do (
-    if not defined FILE_HASH set "FILE_HASH=%%H"
-)
-:: Remove spaces from hash (certutil adds them)
-set "FILE_HASH=!FILE_HASH: =!"
 goto :EOF
