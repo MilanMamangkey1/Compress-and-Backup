@@ -7,11 +7,13 @@ Compresses folders/files using 7-Zip with password protection and encrypted head
 | File | Purpose |
 |------|---------|
 | `compress-and-backup.bat` | Main script (supports multiple jobs) |
+| `run-hidden.vbs` | Run backup silently (hidden terminal window) |
 | `config-editor.bat` | Interactive configuration editor |
 | `config.txt` | Default job configuration |
 | `config-*.txt` | Additional job configurations (e.g., `config-Work.txt`) |
 | `active-job.txt` | Stores the default job name (auto-generated) |
-| `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) || `sync-*.ffs_batch.hash` | Hash file for modification detection (auto-generated) |
+| `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) |
+| `sync-*.ffs_batch.hash` | Hash file for modification detection (auto-generated) |
 | `sync-*.ffs_batch.keep` | Marker file when user keeps custom FFS (auto-generated) |
 ## Quick Start
 
@@ -61,16 +63,45 @@ To skip the selection menu and always run a specific job:
 
 The default job runs automatically when `compress-and-backup.bat` is executed without arguments.
 
+## Silent / Background Running
+
+To run backups without a visible terminal window, use `run-hidden.vbs`:
+
+```batch
+:: Double-click or run directly
+run-hidden.vbs
+
+:: Run specific job
+wscript run-hidden.vbs "Work"
+```
+
+FreeFileSync will also minimize to the notification area (system tray) instead of showing a progress window.
+
+### Task Scheduler Setup (Fully Silent)
+
+For completely silent scheduled backups:
+
+1. Open **Task Scheduler** → Create Task
+2. **General tab**: Name it, check "Run whether user is logged on or not"
+3. **Triggers tab**: Set your schedule (daily, weekly, etc.)
+4. **Actions tab**:
+   - Program: `wscript.exe`
+   - Arguments: `"E:\path\to\run-hidden.vbs" "JobName"`
+   - Start in: `E:\path\to\` (script directory)
+5. **Settings tab**: Uncheck "Stop if running longer than"
+
+This runs completely in the background with no windows.
+
 ### Scheduling Multiple Jobs
 
 Use Windows Task Scheduler to run different jobs at different times:
 
 ```batch
 :: Daily personal backup at 6 PM
-compress-and-backup.bat Personal
+wscript run-hidden.vbs "Personal"
 
 :: Weekly work backup on Fridays
-compress-and-backup.bat Work
+wscript run-hidden.vbs "Work"
 ```
 
 ## Configuration Options

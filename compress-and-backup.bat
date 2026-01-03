@@ -583,7 +583,7 @@ echo     ^<LogFolder/^>
 echo     ^<EmailNotification Condition="Always"/^>
 echo     ^<GridViewType^>Action^</GridViewType^>
 echo     ^<Batch^>
-echo         ^<ProgressDialog Minimized="false" AutoClose="true"/^>
+echo         ^<ProgressDialog Minimized="true" AutoClose="true"/^>
 echo         ^<ErrorDialog^>Show^</ErrorDialog^>
 echo         ^<PostSyncAction^>None^</PostSyncAction^>
 echo     ^</Batch^>
