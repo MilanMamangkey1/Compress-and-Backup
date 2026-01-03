@@ -11,8 +11,8 @@ Compresses folders/files using 7-Zip with password protection and encrypted head
 | `config.txt` | Default job configuration |
 | `config-*.txt` | Additional job configurations (e.g., `config-Work.txt`) |
 | `active-job.txt` | Stores the default job name (auto-generated) |
-| `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) |
-
+| `sync-*.ffs_batch` | Auto-generated FreeFileSync batch (created on run) || `sync-*.ffs_batch.hash` | Hash file for modification detection (auto-generated) |
+| `sync-*.ffs_batch.keep` | Marker file when user keeps custom FFS (auto-generated) |
 ## Quick Start
 
 1. Run `config-editor.bat` to configure your settings, or edit `config.txt` directly
@@ -127,9 +127,38 @@ Run `config-editor.bat` for an interactive menu:
    - Password protects the archive
    - Encrypts file names (`-mhe=on`) for extra security
 
-2. **Generates** a FreeFileSync batch file
+2. **Generates** a FreeFileSync batch file (with modification detection - see below)
 
 3. **Syncs** the archive to the backup destination (Update mode - only copies if changed)
+
+## FreeFileSync Customization
+
+The script auto-generates a `.ffs_batch` file for syncing. If you customize this file (e.g., change sync options, add filters), the script will detect your changes.
+
+### Modification Detection
+
+When the script detects a modified FFS batch file, you'll see:
+
+```
+[WARNING] FreeFileSync batch file has been modified:
+          E:\path\sync-backup.ffs_batch
+
+  [K] Keep your customized version (remember choice)
+  [R] Regenerate fresh from template
+  [C] Cancel operation
+```
+
+| Option | Effect |
+|--------|--------|
+| **[K] Keep** | Uses your customized file and remembers the choice (won't ask again) |
+| **[R] Regenerate** | Overwrites with fresh template (forgets "keep" preference) |
+| **[C] Cancel** | Exits without syncing |
+
+### Resetting the "Keep" Choice
+
+If you previously chose **Keep** but want to be prompted again:
+- Choose **[R]egenerate** when prompted, or
+- Delete the `.ffs_batch.keep` marker file manually
 
 ## Use Cases
 

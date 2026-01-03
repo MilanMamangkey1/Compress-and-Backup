@@ -1,5 +1,7 @@
 *.bak
 *.ffs_batch
+*.ffs_batch.hash
+*.ffs_batch.keep
 *.7z
 Thumbs.db
 desktop.ini
